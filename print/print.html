@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Gemini conversation</title>
+  <link rel="stylesheet" href="print.css">
+</head>
+<body>
+  <div class="screen-bar">
+    <div class="screen-brand">
+      <img src="../assets/icon32.png" alt="" width="30" height="30">
+      <div>
+        <strong>Print view</strong>
+        <span>Choose “Save as PDF” as the destination to create the file.</span>
+      </div>
+    </div>
+    <div class="screen-actions">
+      <button type="button" class="screen-btn ghost" id="closeButton">Close tab</button>
+      <button type="button" class="screen-btn primary" id="printAgainButton" disabled>
+        Print / Save as PDF
+      </button>
+    </div>
+  </div>
+
+  <main class="screen-stage">
+    <div class="status" id="status">
+      <span class="status-spinner" aria-hidden="true"></span>
+      <span id="statusText">Preparing the print view…</span>
+    </div>
+    <article class="paper" id="document" hidden></article>
+  </main>
+
+  <script src="print.js"></script>
+</body>
+</html>
