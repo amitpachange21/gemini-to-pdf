@@ -223,13 +223,26 @@ body {
   margin-bottom: 22px;
 }
 
+.message.user {
+  text-align: right;
+}
+
 .msg-head {
   display: flex;
   align-items: baseline;
   gap: 7px;
+  width: 100%;
   margin-bottom: 6px;
   break-after: avoid;
   page-break-after: avoid;
+}
+
+.message.user .msg-head {
+  justify-content: flex-end;
+}
+
+.message.assistant .msg-head {
+  justify-content: flex-start;
 }
 
 .msg-dot {
@@ -263,15 +276,18 @@ body {
 }
 
 .msg-time {
-  margin-left: auto;
+  margin-left: 6px;
   color: var(--faint);
   font-size: 8px;
 }
 
 .user-panel {
+  width: 72%;
+  margin-left: auto;
   padding: 11px 13px;
   background: var(--user-bg);
   border-radius: 5px;
+  text-align: left;
 }
 
 .user-panel.short {

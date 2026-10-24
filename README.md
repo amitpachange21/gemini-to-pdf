@@ -33,7 +33,7 @@ The PDF is named after the conversation title, for example `Understanding closur
 ## What is exported
 
 - The conversation title, export date, source link, and selected messages.
-- User prompts in a soft blue panel; Gemini responses with a role label.
+- User prompts in a right-aligned soft blue bubble; Gemini responses flow from the left with a role label.
 - Headings, paragraphs, bold/italic text, inline code, links, bulleted and numbered lists, nested lists, block quotes, dividers, tables, and fenced code blocks with language labels.
 - Page headers, footers, and page numbers on A4 pages.
 

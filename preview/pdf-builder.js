@@ -32,6 +32,7 @@
 
   const CODE_CHARS_PER_LINE = 92;
   const CODE_LINES_PER_CHUNK = 48;
+  const USER_BUBBLE_WIDTH = 352;
 
   function sanitizeFilename(title) {
     let base = String(title || 'Gemini chat')
@@ -188,7 +189,7 @@
           bold: true,
           color: COLORS.faint,
           characterSpacing: 0.8,
-          margin: [0, 0, 0, 6]
+          margin: [0, 0, 0, 4]
         });
       }
 
@@ -196,7 +197,7 @@
         text: chunk.join('\n'),
         font: 'RobotoMono',
         fontSize: 8.2,
-        lineHeight: 1.26,
+        lineHeight: 1.24,
         color: '#1F2937',
         preserveLeadingSpaces: true
       });
@@ -217,9 +218,12 @@
           vLineColor: function () { return COLORS.codeBorder; },
           paddingLeft: function () { return 11; },
           paddingRight: function () { return 11; },
-          paddingTop: function () { return 9; },
-          paddingBottom: function () { return 9; }
+          paddingTop: function () { return 7; },
+          paddingBottom: function () { return 7; }
         },
+        unbreakable: true,
+        _g2pdfCode: true,
+        _g2pdfAtomic: true,
         margin: [0, 0, 0, isLast ? 11 : 5]
       });
     });
@@ -276,6 +280,7 @@
         paddingTop: function () { return padding; },
         paddingBottom: function () { return padding; }
       },
+      _g2pdfAtomic: rows.length <= 8,
       margin: [0, 3, 0, 11]
     };
   }
@@ -306,6 +311,7 @@
         paddingTop: function () { return 0; },
         paddingBottom: function () { return 0; }
       },
+      _g2pdfAtomic: true,
       margin: [0, 2, 0, 10]
     };
   }
@@ -336,6 +342,7 @@
             margin: [6, 0, 0, 0]
           }
         ],
+        _g2pdfAtomic: true,
         margin: [0, 0, 0, 4.5]
       });
     }
@@ -359,11 +366,15 @@
 
       if (block.type === 'paragraph') {
         if (!block.runs || !block.runs.length) continue;
+        const textLength = block.runs.reduce(function (total, run) {
+          return total + String((run && run.text) || '').length;
+        }, 0);
         rendered = {
           text: pdfRuns(block.runs),
           fontSize: 9.8,
           lineHeight: 1.43,
           color: COLORS.text,
+          _g2pdfAtomic: textLength <= 300,
           margin: [0, 0, 0, 7]
         };
       } else if (block.type === 'heading') {
@@ -374,6 +385,8 @@
           bold: true,
           color: COLORS.heading,
           lineHeight: 1.25,
+          _g2pdfHeading: true,
+          _g2pdfAtomic: true,
           margin: [0, hasContent ? 9 : 0, 0, 4]
         };
       } else if (block.type === 'list') {
@@ -422,12 +435,55 @@
       }
     }
 
-    return nodes;
+    const grouped = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const next = nodes[i + 1];
+      if (node._g2pdfHeading && next && next._g2pdfAtomic) {
+        grouped.push({
+          stack: [node, next],
+          unbreakable: true,
+          _g2pdfAtomic: true
+        });
+        i += 1;
+      } else {
+        grouped.push(node);
+      }
+    }
+
+    return grouped;
   }
 
   function roleHeader(message, topMargin) {
     const isUser = message.role === 'user';
     const color = isUser ? COLORS.blue : COLORS.purple;
+    const label = isUser ? 'YOU' : 'GEMINI';
+    const timestamp = message.timestamp || '';
+
+    if (isUser) {
+      return {
+        columns: [
+          { width: '*', text: '' },
+          {
+            width: 'auto',
+            text: label,
+            fontSize: 8.2,
+            bold: true,
+            characterSpacing: 1.1,
+            color: color
+          },
+          {
+            width: 'auto',
+            text: timestamp,
+            fontSize: 7.2,
+            color: COLORS.faint,
+            margin: [6, 0, 0, 0]
+          }
+        ],
+        columnGap: 0,
+        margin: [0, topMargin, 0, 4]
+      };
+    }
 
     return {
       columns: [
@@ -443,8 +499,8 @@
           }]
         },
         {
-          width: '*',
-          text: isUser ? 'YOU' : 'GEMINI',
+          width: 'auto',
+          text: label,
           fontSize: 8.2,
           bold: true,
           characterSpacing: 1.1,
@@ -452,34 +508,60 @@
         },
         {
           width: 'auto',
-          text: message.timestamp || '',
-          fontSize: 7.6,
+          text: timestamp,
+          fontSize: 7.2,
           color: COLORS.faint,
-          alignment: 'right'
-        }
+          margin: [6, 0, 0, 0]
+        },
+        { width: '*', text: '' }
       ],
       columnGap: 0,
       margin: [0, topMargin, 0, 5]
     };
   }
 
-  function userPanel(blocks) {
+  function blocksTextLength(blocks) {
+    let total = 0;
+    for (const block of blocks || []) {
+      if (!block) continue;
+      if (block.type === 'code') {
+        total += String(block.text || '').length;
+      } else if (block.type === 'table') {
+        for (const row of block.rows || []) {
+          for (const cell of row || []) total += String(cell == null ? '' : cell).length;
+        }
+      } else if (block.type === 'list') {
+        for (const item of block.items || []) {
+          for (const run of (item && item.runs) || []) total += String((run && run.text) || '').length;
+        }
+      } else if (block.runs) {
+        for (const run of block.runs) total += String((run && run.text) || '').length;
+      }
+    }
+    return total;
+  }
+
+  function userBubble(blocks) {
     return {
       table: {
-        widths: ['*'],
-        body: [[{
-          stack: renderBlocks(blocks),
-          fillColor: COLORS.userPanel
-        }]]
+        widths: ['*', USER_BUBBLE_WIDTH],
+        body: [[
+          { text: '' },
+          {
+            stack: renderBlocks(blocks),
+            fillColor: COLORS.userPanel
+          }
+        ]]
       },
       layout: {
         hLineWidth: function () { return 0; },
         vLineWidth: function () { return 0; },
-        paddingLeft: function () { return 13; },
-        paddingRight: function () { return 13; },
+        paddingLeft: function () { return 14; },
+        paddingRight: function () { return 14; },
         paddingTop: function () { return 10; },
-        paddingBottom: function () { return 2; }
+        paddingBottom: function () { return 3; }
       },
+      _g2pdfAtomic: blocksTextLength(blocks) <= 800,
       margin: [0, 0, 0, 2]
     };
   }
@@ -566,12 +648,32 @@
         else topMargin = 14;
       }
 
-      content.push(roleHeader(message, topMargin));
+      const header = roleHeader(message, topMargin);
 
       if (message.role === 'user') {
-        content.push(userPanel(message.blocks || []));
+        const bubble = userBubble(message.blocks || []);
+        if (bubble._g2pdfAtomic) {
+          content.push({
+            stack: [header, bubble],
+            unbreakable: true
+          });
+        } else {
+          content.push(header);
+          content.push(bubble);
+        }
       } else {
-        content.push.apply(content, renderBlocks(message.blocks || []));
+        const blocks = renderBlocks(message.blocks || []);
+        const first = blocks[0];
+        if (first && first._g2pdfAtomic) {
+          content.push({
+            stack: [header, first],
+            unbreakable: true
+          });
+          content.push.apply(content, blocks.slice(1));
+        } else {
+          content.push(header);
+          content.push.apply(content, blocks);
+        }
       }
 
       if (index < model.messages.length - 1) {
